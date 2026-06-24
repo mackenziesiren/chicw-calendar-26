@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Chicago Climate Week (ChiCW) Calendar</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1f2a24;
+    --muted: #6b7a72;
+    --line: #e4e2d8;
+    --line-strong: #d2cfc2;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { overflow-x: hidden; }
+  body {
+    margin: 0;
+    padding: 16px 12px 36px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h1 { font-size: 17px; font-weight: 700; margin: 0 0 2px; }
+  .subtitle { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+  }
+  .filter-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-right: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1.5px solid var(--line-strong);
+    background: #fff;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .filter-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .filter-chip .checkmark { display: none; font-weight: 700; margin-right: 2px; }
+  .filter-chip input:checked ~ .checkmark { display: inline; }
+  .filter-chip input:checked ~ .label { font-weight: 700; }
+  .filter-chip.checked {
+    background: #1f2a24;
+    color: #fff;
+    border-color: #1f2a24;
+  }
+  .filter-count { font-size: 11px; color: var(--muted); margin-left: 2px; }
+  .filter-clear {
+    margin-left: auto;
+    border: none; background: none; color: var(--muted);
+    font-size: 11.5px; text-decoration: underline; cursor: pointer; padding: 4px 2px;
+  }
+
+  .day-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .day-nav-arrow {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--line-strong);
+    background: #fff;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    padding: 0;
+    flex: 0 0 auto;
+  }
+  .day-nav-arrow:disabled { opacity: 0.35; }
+  .day-nav-label { font-size: 15px; font-weight: 700; color: var(--ink); flex: 1; text-align: center; }
+
+  .schedule-wrap {
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: #fff;
+  }
+  .schedule-flex { display: flex; width: 100%; }
+
+  .gutter { width: var(--gutter-px); flex-shrink: 0; flex-grow: 0; position: sticky; left: 0; z-index: 6; background: #fff; }
+  .gutter-header { height: 50px; border-bottom: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong); background: #fff; }
+  .gutter-allday { height: 28px; border-bottom: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong); }
+  .gutter-body { position: relative; border-right: 1px solid var(--line-strong); }
+  .hour-label {
+    position: absolute; right: 5px; transform: translateY(-50%);
+    font-size: 10px; color: var(--muted); white-space: nowrap;
+  }
+
+  .day-col { flex: 1 1 auto; min-width: 0; display: none; }
+  .day-col.is-active { display: block; }
+  .day-header {
+    height: 50px; position: sticky; top: 0; z-index: 5; background: #fff;
+    border-bottom: 1px solid var(--line-strong);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .day-header .dow { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .day-header .num { font-size: 15px; font-weight: 700; }
+  .day-allday { height: 28px; border-bottom: 1px solid var(--line-strong); padding: 3px 6px; display: flex; gap: 4px; overflow: hidden; }
+  .allday-pill {
+    background: #f0ede0; color: #6b5a22; font-size: 10px; font-weight: 600;
+    padding: 2px 6px; border-radius: 5px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 100%;
+  }
+  .day-body { position: relative; }
+
+  .event-block {
+    position: absolute;
+    border-radius: 6px;
+    overflow: hidden;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    line-height: 1.3;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 0 1px rgba(0,0,0,0.06);
+  }
+  .event-block .et-title { font-weight: 700; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .event-block .et-time { display: block; opacity: 0.85; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .detail-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: none; z-index: 30;
+  }
+  .detail-overlay.is-open { display: block; }
+  .detail-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: #fff; border-radius: 16px 16px 0 0;
+    padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -10px 28px rgba(0,0,0,0.2);
+    z-index: 31;
+    transform: translateY(102%);
+    transition: transform 0.2s ease-out;
+    max-height: 72vh;
+    overflow-y: auto;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .detail-sheet.is-open { transform: translateY(0); }
+  .detail-icon {
+    display: block; max-height: 48px; max-width: 50%; object-fit: contain;
+    margin-bottom: 10px; background: #f0ede0; border-radius: 6px; padding: 5px;
+  }
+  .detail-sheet h2 { font-size: 17px; margin: 0 0 6px; padding-right: 34px; line-height: 1.3; }
+  .detail-close {
+    position: absolute; top: 14px; right: 16px; width: 32px; height: 32px;
+    border-radius: 50%; border: none; background: #f0ede0; font-size: 16px;
+    cursor: pointer; color: var(--ink);
+  }
+  .detail-time { color: var(--muted); font-size: 13.5px; margin-bottom: 4px; display: block; }
+  .detail-loc { font-size: 13.5px; color: var(--ink); margin-bottom: 10px; display: block; }
+  .detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .detail-tag { background: #f0ede0; color: #6b5a22; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+  .detail-rsvp {
+    display: block; text-align: center; background: #1f2a24; color: #fff;
+    padding: 13px; border-radius: 10px; font-weight: 700; font-size: 14.5px;
+    text-decoration: none;
+  }
+
+  .footer { text-align: center; color: var(--muted); font-size: 10.5px; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <h1>Chicago Climate Week (ChiCW)</h1>
+  <div class="subtitle" id="subtitle"></div>
+
+  <div class="filter-bar" id="filterBar">
+    <span class="filter-label">Filter</span>
+  </div>
+
+  <div class="day-nav" id="dayNav">
+    <button class="day-nav-arrow" id="prevDayBtn" aria-label="Previous day">←</button>
+    <span class="day-nav-label" id="dayNavLabel"></span>
+    <button class="day-nav-arrow" id="nextDayBtn" aria-label="Next day">→</button>
+  </div>
+
+  <div class="schedule-wrap">
+    <div class="schedule-flex" id="scheduleFlex"></div>
+  </div>
+  <div class="footer" id="footer"></div>
+
+  <div class="detail-overlay" id="detailOverlay"></div>
+  <div class="detail-sheet" id="detailSheet">
+    <button class="detail-close" id="detailCloseBtn" aria-label="Close">✕</button>
+    <img class="detail-icon" id="detailIcon" alt="" style="display:none;">
+    <h2 id="detailTitle"></h2>
+    <span class="detail-time" id="detailTime"></span>
+    <span class="detail-loc" id="detailLoc"></span>
+    <div class="detail-tags" id="detailTags"></div>
+    <a class="detail-rsvp" id="detailRsvp" target="_blank" rel="noopener">RSVP →</a>
+  </div>
+
+<script>
+const DATA = {"calendarName": "Chicago Climate Week (ChiCW)", "days": ["2026-07-15", "2026-07-16", "2026-07-17", "2026-07-18", "2026-07-19", "2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26"], "dayLabels": ["Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "dayNums": ["Jul 15", "Jul 16", "Jul 17", "Jul 18", "Jul 19", "Jul 20", "Jul 21", "Jul 22", "Jul 23", "Jul 24", "Jul 25", "Jul 26"], "displayStartHour": 8, "displayEndHour": 26, "hourPx": 80, "gutterPx": 46, "totalHours": 18, "byDay": {"2026-07-15": [{"title": "Climate Innovation Summit", "location": "https://www.eventbrite.com/e/climate-innovation-summit-tickets-1989327940421?aff=oddtdtcreator", "host": "Chicago Innovation", "rsvpUrl": "https://www.eventbrite.com/e/climate-innovation-summit-tickets-1989327940421?aff=oddtdtcreator", "tags": ["Key Partner Event"], "logoUrl": "https://images.squarespace-cdn.com/content/v1/69af569604401666fea8c9b5/dee0f7eb-0cca-407f-a2b5-bec2ae3ccc7e/black+c3+logo+%2814%29.png", "time_label": "1 PM \u2013 6:30 PM", "hstart": 13.0, "hend": 18.5, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 2}, {"title": "Chicago Climate Week Opening Reception & Preview", "location": "Moonlight Studios, 1466 W Kinzie St, Chicago, IL 60642, USA", "host": "Chicago Climate Week", "rsvpUrl": "https://luma.com/v9qrawi0", "tags": [], "logoUrl": null, "time_label": "5 PM \u2013 7 PM", "hstart": 17.0, "hend": 19.0, "color": "#3372b1", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 2}], "2026-07-16": [{"title": "mHUB Community BBQ", "location": "mHUB, 1623 W Fulton St, Chicago, IL 60612, USA", "host": "Christian Luna", "rsvpUrl": "https://luma.com/2026mHUBCommunityBBQ", "tags": ["Outdoor Event/Activity"], "logoUrl": null, "time_label": "4:30 PM \u2013 9:30 PM", "hstart": 16.5, "hend": 21.5, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}], "2026-07-17": [{"title": "Chicago Climate Connect presents: An Eco-Horror Film Screening atMusic Box Theatre", "location": "Music Box Theatre, 3733 N Southport Ave, Chicago, IL 60613, USA", "host": "Mackenzie Siren", "rsvpUrl": "https://luma.com/oae7sjem", "tags": [], "logoUrl": null, "time_label": "9:30 PM \u2013 12 AM", "hstart": 21.5, "hend": 24.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}], "2026-07-18": [{"title": "Native Garden Party Pop Up", "location": "https://prairiestatevintage.com/", "host": "Prairie State Vintage & Garden", "rsvpUrl": "https://prairiestatevintage.com/", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "9 AM \u2013 2 PM", "hstart": 9.0, "hend": 14.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 4}, {"title": "Community Paddling Day", "location": "https://openlands.jotform.com/260744036271958", "host": "Openlands", "rsvpUrl": "https://openlands.jotform.com/260744036271958", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "10 AM \u2013 1 PM", "hstart": 10.0, "hend": 13.0, "color": "#3372b1", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 4}, {"title": "CBCU Beach Clean-up: Chicago Climate Week Edition", "location": "https://getpie.app/plans/e9256320-f911-45db-8a02-71ecd63d3991?utm_campaign=event&utm_link_source=pie&utm_platform=web", "host": "Chicago Beach CleanUp", "rsvpUrl": "https://getpie.app/plans/e9256320-f911-45db-8a02-71ecd63d3991?utm_campaign=event&utm_link_source=pie&utm_platform=web", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "11 AM \u2013 12:30 PM", "hstart": 11.0, "hend": 12.5, "color": "#294525", "textColor": "#ffffff", "track": 2, "tracks_in_cluster": 4}, {"title": "Bevapalooza Reuse & Recycling Pop-Up", "location": "https://theunwasteshop.com/blogs/news/recycling-guide-beverly-illinois", "host": "The Unwaste Shop", "rsvpUrl": "https://theunwasteshop.com/blogs/news/recycling-guide-beverly-illinois", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "11 AM \u2013 3 PM", "hstart": 11.0, "hend": 15.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 3, "tracks_in_cluster": 4}, {"title": "Hand-crafted Incense Workshop", "location": "https://thirdseason.com/collections/events-and-workshops/products/hand-crafted-incense-workshop-with-hard-broom-incense-saturday-july-18th-1-3-pm", "host": "Third Season & Hard Broom Incense", "rsvpUrl": "https://thirdseason.com/collections/events-and-workshops/products/hand-crafted-incense-workshop-with-hard-broom-incense-saturday-july-18th-1-3-pm", "tags": [], "logoUrl": null, "time_label": "1 PM \u2013 1:30 PM", "hstart": 13.0, "hend": 13.5, "color": "#80c0cf", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 4}, {"title": "Rising Waters: A Community Mixer", "location": "https://floodingcoalitionevent.rsvpify.com/", "host": "Alliance for the Great Lakes", "rsvpUrl": "https://floodingcoalitionevent.rsvpify.com/", "tags": ["Free Event"], "logoUrl": null, "time_label": "2:30 PM \u2013 4:30 PM", "hstart": 14.5, "hend": 16.5, "color": "#face6e", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 4}, {"title": "Climate Optimism: Yoga and Connection", "location": "https://www.meetup.com/citizens-climate-lobby-chicago/events/315234224/?utm_medium=referral&utm_campaign=share-btn_savedevents_share_modal&utm_source=link&utm_version=v2&member_id=418891528", "host": "Michelina Boehmer & Citizen's Climate Lobby", "rsvpUrl": "https://www.meetup.com/citizens-climate-lobby-chicago/events/315234224/?utm_medium=referral&utm_campaign=share-btn_savedevents_share_modal&utm_source=link&utm_version=v2&member_id=418891528", "tags": ["Free Event"], "logoUrl": null, "time_label": "4 PM \u2013 6 PM", "hstart": 16.0, "hend": 18.0, "color": "#e23921", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 4}], "2026-07-19": [{"title": "Summer 2026 SportSwap", "location": "https://www.gogreenglenellyn.org/sport-swap-1", "host": "Go Green Glen Ellyn", "rsvpUrl": "https://www.gogreenglenellyn.org/sport-swap-1", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "1 PM \u2013 2 PM", "hstart": 13.0, "hend": 14.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "5th Annual Wild Mile Block Party", "location": "https://events.ticketleap.com/tickets/urban-rivers-9/5th-annual-wild-mile-block-party", "host": "Urban Rivers", "rsvpUrl": "https://events.ticketleap.com/tickets/urban-rivers-9/5th-annual-wild-mile-block-party", "tags": ["Free Event", "Outdoor Event/Activity", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "3 PM \u2013 8 PM", "hstart": 15.0, "hend": 20.0, "color": "#3372b1", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "Climate Stakeholder Gathering: Networking Mixer", "location": "https://luma.com/event/evt-P7zmZbDGvyY5F9g", "host": "Danny", "rsvpUrl": "https://luma.com/b5hrbrds", "tags": ["Free Event", "Virtual Event"], "logoUrl": null, "time_label": "8 PM \u2013 9 PM", "hstart": 20.0, "hend": 21.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 1}], "2026-07-20": [{"title": "Climate Week Networking Breakfast - Sloan & WCSP", "location": "https://docs.google.com/forms/d/e/1FAIpQLScTFUutzz4HkkV5IbXC20QGQbTeJlZAmXtJpzh4cS4ibLReNg/viewform?usp=dialog", "host": "Sloan & Windy City Sustainability Professionals", "rsvpUrl": "https://docs.google.com/forms/d/e/1FAIpQLScTFUutzz4HkkV5IbXC20QGQbTeJlZAmXtJpzh4cS4ibLReNg/viewform?usp=dialog", "tags": ["Free Event"], "logoUrl": null, "time_label": "8:30 AM \u2013 10 AM", "hstart": 8.5, "hend": 10.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "Inside, Outside, Upside Down: How Corporate Sustainability Professionals are Navigating 2026", "location": "Chicago Athletic Association - The Unbound Collection by Hyatt, 12 S Michigan Ave, Chicago, IL 60603, USA", "host": "Rachel Fleishman", "rsvpUrl": "https://luma.com/7n4symrv", "tags": ["Free Event"], "logoUrl": null, "time_label": "10 AM \u2013 11 AM", "hstart": 10.0, "hend": 11.0, "color": "#3372b1", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "Birds and Bites: Climate Solutions from the Ground Up", "location": "https://www.mobilize.us/audubon-great-lakes/event/974064/", "host": "Audubon Great Lakes", "rsvpUrl": "https://www.mobilize.us/audubon-great-lakes/event/974064/", "tags": ["Free Event"], "logoUrl": null, "time_label": "11:30 AM \u2013 1 PM", "hstart": 11.5, "hend": 13.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 2}, {"title": "Greening Your Finances", "location": "https://luma.com/event/evt-YoMbWgLyo6ehy8g", "host": "GreenPortfolio", "rsvpUrl": "https://luma.com/6im4fhpo", "tags": ["Free Event", "Virtual Event"], "logoUrl": null, "time_label": "12:30 PM \u2013 1 PM", "hstart": 12.5, "hend": 13.0, "color": "#294525", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 2}, {"title": "Climate in Focus: Conversation through the Lens of Creatives", "location": "Leica Store and Gallery Chicago, 800 N Michigan Ave, Chicago, IL60611, USA", "host": "Joy Vision Studio", "rsvpUrl": "https://luma.com/v2np2ue4", "tags": ["Free Event"], "logoUrl": null, "time_label": "1:30 PM \u2013 3:30 PM", "hstart": 13.5, "hend": 15.5, "color": "#80c0cf", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 1}, {"title": "Aspen Ideas: Climate Chicago - Kickoff", "location": "https://www.aspenideas.org/pages/aspen-ideas-climate", "host": "Aspen Institute & Chicago Climate Corps ", "rsvpUrl": "https://www.aspenideas.org/pages/aspen-ideas-climate", "tags": [], "logoUrl": null, "time_label": "6 PM \u2013 9 PM", "hstart": 18.0, "hend": 21.0, "color": "#face6e", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 2}, {"title": "Youth Voices: Busting Climate Myths in the Digital Age", "location": "Naperville Public Library - Nichols Library, 200 W Jefferson Ave, Naperville, IL 60540, USA", "host": "Youth Leaders", "rsvpUrl": "https://luma.com/qz6cegc2", "tags": ["Free Event", "Virtual Event"], "logoUrl": null, "time_label": "6:30 PM \u2013 8 PM", "hstart": 18.5, "hend": 20.0, "color": "#e23921", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 2}], "2026-07-21": [{"title": "Aspen Ideas: Climate Chicago - Day One", "location": "https://www.aspenideas.org/pages/aspen-ideas-climate", "host": "Aspen Institute & Chicago Climate Corps", "rsvpUrl": "https://www.aspenideas.org/pages/aspen-ideas-climate", "tags": [], "logoUrl": null, "time_label": "8 AM \u2013 8 PM", "hstart": 8.0, "hend": 20.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 2}, {"title": "Pilot Readiness - Designing and Running a Pilot", "location": "https://mhub.org/events/pilot-readiness---designing-and-running-a-pilot-186793", "host": "mHUB", "rsvpUrl": "https://mhub.org/events/pilot-readiness---designing-and-running-a-pilot-186793", "tags": ["Free Event", "Virtual Event"], "logoUrl": null, "time_label": "11 AM \u2013 12 PM", "hstart": 11.0, "hend": 12.0, "color": "#3372b1", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 2}, {"title": "Energy Affordability Roundtable + GreenRise tour", "location": "Institute of Cultural Affairs, 4750 N Sheridan Rd, Chicago, IL 60640, USA", "host": "Rory Gilchrist", "rsvpUrl": "https://luma.com/crp5ykbz", "tags": ["Free Event", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "2 PM \u2013 4:30 PM", "hstart": 14.0, "hend": 16.5, "color": "#8cb457", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 2}], "2026-07-22": [{"title": "Aspen Ideas: Climate Chicago - Day Two", "location": "https://www.aspenideas.org/pages/aspen-ideas-climate", "host": "Aspen Institute & Chicago Climate Corps ", "rsvpUrl": "https://www.aspenideas.org/pages/aspen-ideas-climate", "tags": [], "logoUrl": null, "time_label": "8 AM \u2013 8 PM", "hstart": 8.0, "hend": 20.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 4}, {"title": "Environmental Risk and Resilience Workshop Day: Chicago Climate Week", "location": "https://events-meetings.kpmg.com/event/G9N6Z7PWRY7/summary", "host": "KPMG & Risilience", "rsvpUrl": "https://events-meetings.kpmg.com/event/G9N6Z7PWRY7/summary", "tags": ["Free Event"], "logoUrl": null, "time_label": "8:30 AM \u2013 3 PM", "hstart": 8.5, "hend": 15.0, "color": "#3372b1", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 4}, {"title": "Bleeding The Planet: Period Waste & Sustainable Innovation", "location": "West Loop Branch, Chicago Public Library, 122 N Aberdeen St, Chicago, IL 60607, USA", "host": "Kieanji Williams", "rsvpUrl": "https://luma.com/vab52t5m", "tags": ["Free Event"], "logoUrl": null, "time_label": "2 PM \u2013 3 PM", "hstart": 14.0, "hend": 15.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 2, "tracks_in_cluster": 4}, {"title": "Getting to Zero Emissions with Run On Climate", "location": "Windfree Solar Cafe, 517 Dempster St, Evanston, IL 60201, USA", "host": "Quinton Zondervan", "rsvpUrl": "https://luma.com/321hr681", "tags": ["Free Event"], "logoUrl": null, "time_label": "4 PM \u2013 6 PM", "hstart": 16.0, "hend": 18.0, "color": "#294525", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 4}, {"title": "All-Electric LEED Platinum Home Tour", "location": "https://docs.google.com/forms/d/e/1FAIpQLSfsHNbcDfWMaEC-tTYDO0PvoyA7Y4SFQvRMEDJCu3IGS9P6BQ/viewform", "host": "The Electric Home Company", "rsvpUrl": "https://docs.google.com/forms/d/e/1FAIpQLSfsHNbcDfWMaEC-tTYDO0PvoyA7Y4SFQvRMEDJCu3IGS9P6BQ/viewform", "tags": ["Free Event", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "4:30 PM \u2013 7 PM", "hstart": 16.5, "hend": 19.0, "color": "#80c0cf", "textColor": "#1f2a24", "track": 2, "tracks_in_cluster": 4}, {"title": "4 Big Bills", "location": "Impact House, 200 W Madison St, Chicago, IL 60606, USA", "host": "Claire T. McNorton", "rsvpUrl": "https://luma.com/mcni7220", "tags": ["Free Event"], "logoUrl": null, "time_label": "5 PM \u2013 7 PM", "hstart": 17.0, "hend": 19.0, "color": "#face6e", "textColor": "#1f2a24", "track": 3, "tracks_in_cluster": 4}, {"title": "SparkLabs Founders Dinner", "location": "https://partiful.com/e/y0OjQV0FTtkqHxrSiVYH", "host": "SparkLabs Group", "rsvpUrl": "https://partiful.com/e/y0OjQV0FTtkqHxrSiVYH", "tags": ["Free Event"], "logoUrl": null, "time_label": "6:30 PM \u2013 9:30 PM", "hstart": 18.5, "hend": 21.5, "color": "#e23921", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 4}], "2026-07-23": [{"title": "Save the Date: Chicago Climate Week's Career Development Day", "location": "Morningstar, 22 W Washington St #7, Chicago, IL 60602, USA", "host": "Chicago Climate Week", "rsvpUrl": "https://luma.com/le8ovmpu", "tags": [], "logoUrl": null, "time_label": "9 AM \u2013 1 PM", "hstart": 9.0, "hend": 13.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 5}, {"title": "Tech Meets Green - PCs for People Tech Tour", "location": "https://events.eventnoire.com/e/pcs-for-people-tech-center-tour-10-00-am", "host": "PCs for People", "rsvpUrl": "https://events.eventnoire.com/e/pcs-for-people-tech-center-tour-10-00-am", "tags": [], "logoUrl": null, "time_label": "10 AM \u2013 11 AM", "hstart": 10.0, "hend": 11.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 5}, {"title": "Chicago Region Tree Initiative Tree Walk", "location": "https://mortonarb.tfaforms.net/48?id=a5gVy0000017zXdIAI", "host": "Chicago Region Tree Initiative ", "rsvpUrl": "https://mortonarb.tfaforms.net/48?id=a5gVy0000017zXdIAI", "tags": ["Free Event", "Outdoor Event/Activity", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "10 AM \u2013 11 AM", "hstart": 10.0, "hend": 11.0, "color": "#3372b1", "textColor": "#ffffff", "track": 2, "tracks_in_cluster": 5}, {"title": "AEG Chicago 26Q3 Stakeholder Challenge: Affordability & Grid Optimization", "location": "Burns & McDonnell, At&T Center, 200 W Adams St UNIT 2700, Chicago, IL 60606, USA", "host": "Luma Event", "rsvpUrl": "https://luma.com/chi26q3", "tags": [], "logoUrl": null, "time_label": "11:30 AM \u2013 4:30 PM", "hstart": 11.5, "hend": 16.5, "color": "#294525", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 5}, {"title": "Co_Invest Climate 2026", "location": "Blackhawks Ice Center Presented by Fifth Third Bank, 1801 W Jackson Blvd, Chicago, IL 60612, USA", "host": "Luma Event", "rsvpUrl": "https://luma.com/Co_InvestClimate26", "tags": ["Key Partner Event"], "logoUrl": "https://images.squarespace-cdn.com/content/v1/69af569604401666fea8c9b5/711e1a65-84eb-4f1c-8a13-7823074af997/Evergreen_Climate_Innovations_Logo_Primary_On_White-1.png", "time_label": "12:30 PM \u2013 7:30 PM", "hstart": 12.5, "hend": 19.5, "color": "#80c0cf", "textColor": "#1f2a24", "track": 2, "tracks_in_cluster": 5}, {"title": "Tech Meets Green - PCs for People Tech Tour", "location": "https://events.eventnoire.com/e/pcs-for-people-tech-center-tour-2-00-pm-2", "host": "PCs for People", "rsvpUrl": "https://events.eventnoire.com/e/pcs-for-people-tech-center-tour-2-00-pm-2", "tags": [], "logoUrl": null, "time_label": "2 PM \u2013 3 PM", "hstart": 14.0, "hend": 15.0, "color": "#face6e", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 5}, {"title": "Powering Partnerships: Clean Energy Roundtables", "location": "https://luma.com/event/evt-0dAZh7kd3MBf2rZ", "host": "Alejandro Macias", "rsvpUrl": "https://luma.com/49h6ycn6", "tags": ["Free Event"], "logoUrl": null, "time_label": "2:10 PM \u2013 3:20 PM", "hstart": 14.166666666666666, "hend": 15.333333333333332, "color": "#e23921", "textColor": "#ffffff", "track": 3, "tracks_in_cluster": 5}, {"title": "Oak Park Green Night Out (Kids Night!)", "location": "https://thursdaynightout.com/about/", "host": "Thursday Night Out ", "rsvpUrl": "https://thursdaynightout.com/about/", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "5 PM \u2013 9 PM", "hstart": 17.0, "hend": 21.0, "color": "#3372b1", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 5}, {"title": "Degrowth: A just transition to a smaller global economy", "location": "https://www.zeffy.com/en-US/ticketing/chicago-climate-week-degrowth-a-just-transtion-to-a-smaller-global-economy", "host": "Degrowth Institute", "rsvpUrl": "https://www.zeffy.com/en-US/ticketing/chicago-climate-week-degrowth-a-just-transtion-to-a-smaller-global-economy", "tags": ["Free Event"], "logoUrl": null, "time_label": "5:30 PM \u2013 7 PM", "hstart": 17.5, "hend": 19.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 5}, {"title": "Eco.Logic Social", "location": "Pilot Project Brewing - Logan Square, 2140 N Milwaukee Ave, Chicago, IL 60647, USA", "host": "Rozina Kanchwala", "rsvpUrl": "https://luma.com/70sucj8x", "tags": ["Free Event"], "logoUrl": null, "time_label": "5:30 PM \u2013 8:30 PM", "hstart": 17.5, "hend": 20.5, "color": "#294525", "textColor": "#ffffff", "track": 3, "tracks_in_cluster": 5}, {"title": "Illinois Green Alliance Summer Boat Cruise Social", "location": "https://www.illinoisgreenalliance.org/summer-social", "host": "Illinois Green Alliance", "rsvpUrl": "https://www.illinoisgreenalliance.org/summer-social", "tags": ["Outdoor Event/Activity"], "logoUrl": null, "time_label": "6 PM \u2013 8:30 PM", "hstart": 18.0, "hend": 20.5, "color": "#80c0cf", "textColor": "#1f2a24", "track": 4, "tracks_in_cluster": 5}, {"title": "Climate Karaoke \ud83c\udfa4 Presented by SN\u00d8CAP & gener8tor", "location": "https://luma.com/event/evt-LuI2NyaxcMUqbEB", "host": "Jonathan Azoff", "rsvpUrl": "https://luma.com/ms8ua15z", "tags": [], "logoUrl": null, "time_label": "8 PM \u2013 1 AM", "hstart": 20.0, "hend": 25.0, "color": "#face6e", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 5}], "2026-07-24": [{"title": "Journaling in Nature", "location": "1020 S Union Ave, Chicago, IL 60607, USA", "host": "Elise RoBison", "rsvpUrl": "https://luma.com/ydv524rh", "tags": ["Free Event", "Outdoor Event/Activity", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "12 PM \u2013 1:30 PM", "hstart": 12.0, "hend": 13.5, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "Campus Sustainability Tour", "location": "Loyola University Chicago, 1032 W Sheridan Rd, Chicago, IL 60660, USA", "host": "Maya Kelly", "rsvpUrl": "https://luma.com/o5jwbxsj", "tags": ["Free Event", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "2 PM \u2013 3:30 PM", "hstart": 14.0, "hend": 15.5, "color": "#3372b1", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}, {"title": "Founders and Funders in Sustainable Technology (Tech Week)", "location": "Polsky Exchange North, 1452 E 53rd St, Chicago, IL 60615, USA", "host": "Abierre Minor", "rsvpUrl": "https://luma.com/wxgxbsko", "tags": [], "logoUrl": null, "time_label": "5 PM \u2013 7:30 PM", "hstart": 17.0, "hend": 19.5, "color": "#8cb457", "textColor": "#1f2a24", "track": 0, "tracks_in_cluster": 1}], "2026-07-25": [{"title": "Pullman Railroad Days", "location": "https://www.eventbrite.com/cc/pullman-railroad-days-3194039", "host": "Friends of Pullman National Historical Park", "rsvpUrl": "https://www.eventbrite.com/cc/pullman-railroad-days-3194039", "tags": ["Free Event", "Outdoor Event/Activity", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "9 AM \u2013 2 AM", "hstart": 9.0, "hend": 26.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 5}, {"title": "Earth & Essence", "location": "CC Fulton Market, 315 N Green St, Chicago, IL 60607, USA", "host": "HIRA Company Collaborative", "rsvpUrl": "https://luma.com/rzjegin7", "tags": ["Free Event"], "logoUrl": null, "time_label": "10 AM \u2013 1 PM", "hstart": 10.0, "hend": 13.0, "color": "#8cb457", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 5}, {"title": "Community Climbing Day (three time options)", "location": "https://endurancecui.active.com/new/events/96362505/select-race?e4p=af39ae19-979a-4d8f-991d-f29dc097014d&e4ts=1780779408&e4q=2b71ea04-9c15-457b-9de0-02f9d4756e05&e4c=active&e4e=snawe00000000&e4h=aadc1897c33e8436c6ed053317b17517&e4rt=Safetynet&error=login_required&state=17a58db5-4174-4891-8e3b-6fc2b1b70951&_p=7416027784123107", "host": "Chicago Adventure Therapy & Chicago Park District", "rsvpUrl": "https://endurancecui.active.com/new/events/96362505/select-race?e4p=af39ae19-979a-4d8f-991d-f29dc097014d&e4ts=1780779408&e4q=2b71ea04-9c15-457b-9de0-02f9d4756e05&e4c=active&e4e=snawe00000000&e4h=aadc1897c33e8436c6ed053317b17517&e4rt=Safetynet&error=login_required&state=17a58db5-4174-4891-8e3b-6fc2b1b70951&_p=7416027784123107", "tags": ["Free Event", "Outdoor Event/Activity"], "logoUrl": null, "time_label": "10 AM \u2013 1 PM", "hstart": 10.0, "hend": 13.0, "color": "#3372b1", "textColor": "#ffffff", "track": 2, "tracks_in_cluster": 5}, {"title": "TRC Green Roof Tour", "location": "https://thirdseason.com/collections/events-and-workshops/products/trc-green-roof-tour-friday-july-25th-12-00-12-30pm", "host": "The Roof Crop", "rsvpUrl": "https://thirdseason.com/collections/events-and-workshops/products/trc-green-roof-tour-friday-july-25th-12-00-12-30pm", "tags": ["Outdoor Event/Activity", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "12 PM \u2013 12:30 PM", "hstart": 12.0, "hend": 12.5, "color": "#80c0cf", "textColor": "#1f2a24", "track": 3, "tracks_in_cluster": 5}, {"title": "Save the date: Marketplace of the Future & Chicago Climate Week Closing Celebration", "location": "mHUB, 1623 W Fulton St, Chicago, IL 60612, USA", "host": "Chicago Climate Week", "rsvpUrl": "https://luma.com/hkwr6pq5", "tags": [], "logoUrl": null, "time_label": "12 PM \u2013 9 PM", "hstart": 12.0, "hend": 21.0, "color": "#294525", "textColor": "#ffffff", "track": 4, "tracks_in_cluster": 5}, {"title": "Chicago Climate-Smart Home Tour", "location": "https://docs.google.com/forms/d/e/1FAIpQLScn31_5-fr2qgrc3moa1a67cCIL_hAaxONDOd6gO-vLDFvuaQ/viewform", "host": "Illinois Clinicians for Climate Action, Third Act Illinois, and Illinois PIRG Education Fund", "rsvpUrl": "https://docs.google.com/forms/d/e/1FAIpQLScn31_5-fr2qgrc3moa1a67cCIL_hAaxONDOd6gO-vLDFvuaQ/viewform", "tags": ["Free Event", "Tour/Onsite Experience"], "logoUrl": null, "time_label": "1 PM \u2013 2 PM", "hstart": 13.0, "hend": 14.0, "color": "#face6e", "textColor": "#1f2a24", "track": 1, "tracks_in_cluster": 5}, {"title": "Chicago Fair Trade Styling Event", "location": "https://climateweekstyle.eventbrite.com", "host": "Chicago Fair Trade", "rsvpUrl": "https://climateweekstyle.eventbrite.com", "tags": ["Free Event"], "logoUrl": null, "time_label": "4 PM \u2013 7 PM", "hstart": 16.0, "hend": 19.0, "color": "#e23921", "textColor": "#ffffff", "track": 1, "tracks_in_cluster": 5}], "2026-07-26": [{"title": "The Trashy Summer Market", "location": "https://trashy-summer-2026.eventbrite.com", "host": "Nowhere Collective", "rsvpUrl": "https://trashy-summer-2026.eventbrite.com", "tags": ["Free Event"], "logoUrl": null, "time_label": "10 AM \u2013 4 PM", "hstart": 10.0, "hend": 16.0, "color": "#e23921", "textColor": "#ffffff", "track": 0, "tracks_in_cluster": 1}]}, "allDayByDay": {"2026-07-15": [], "2026-07-16": [], "2026-07-17": [], "2026-07-18": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-19": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-20": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-21": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-22": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-23": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-24": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-25": ["Climate Week Hackathon: UN Association of Chicago x Climate Solutions Studio"], "2026-07-26": []}, "hasAllDay": true, "allTags": ["Free Event", "Virtual Event", "Outdoor Event/Activity", "Tour/Onsite Experience", "ChiCW Signature Event", "Key Partner Event"], "tagColors": {"Free Event": "#8cb457", "Virtual Event": "#3372b1", "Outdoor Event/Activity": "#294525", "Tour/Onsite Experience": "#80c0cf", "ChiCW Signature Event": "#e23921", "Key Partner Event": "#face6e"}, "defaultDayIndex": 3, "generatedAt": "2026-06-24T04:35:47.175535Z"};
+
+document.documentElement.style.setProperty('--gutter-px', DATA.gutterPx + 'px');
+
+document.getElementById("subtitle").textContent =
+  `Last Updated: ${new Date(DATA.generatedAt).toLocaleString()}`;
+document.getElementById("footer").textContent =
+  "Source: Luma calendar ICS feed, tags cross-referenced from Airtable · tap a block for details";
+
+const flex = document.getElementById("scheduleFlex");
+const bodyHeight = DATA.totalHours * DATA.hourPx;
+
+function hourLabel(h) {
+  const hh = Math.floor(h) % 24;
+  const ampm = hh >= 12 ? "PM" : "AM";
+  let display = hh % 12;
+  if (display === 0) display = 12;
+  return display + " " + ampm;
+}
+
+// ---- Filter bar -----------------------------------------------------
+const filterBar = document.getElementById("filterBar");
+const activeTags = new Set();
+
+DATA.allTags.forEach(tag => {
+  const chip = document.createElement("label");
+  chip.className = "filter-chip";
+  chip.innerHTML = `<input type="checkbox" value="${tag}"><span class="checkmark">✓</span><span class="label">${tag}</span>`;
+  const input = chip.querySelector("input");
+  input.addEventListener("change", () => {
+    if (input.checked) { activeTags.add(tag); chip.classList.add("checked"); }
+    else { activeTags.delete(tag); chip.classList.remove("checked"); }
+    applyFilters();
+  });
+  filterBar.appendChild(chip);
+});
+
+const filterCount = document.createElement("span");
+filterCount.className = "filter-count";
+filterBar.appendChild(filterCount);
+
+const clearBtn = document.createElement("button");
+clearBtn.className = "filter-clear";
+clearBtn.textContent = "Clear";
+clearBtn.addEventListener("click", () => {
+  activeTags.clear();
+  filterBar.querySelectorAll(".filter-chip").forEach(chip => {
+    chip.querySelector("input").checked = false;
+    chip.classList.remove("checked");
+  });
+  applyFilters();
+});
+filterBar.appendChild(clearBtn);
+
+// ---- Detail sheet (replaces hover tooltip on touch devices) ---------
+const overlay = document.getElementById("detailOverlay");
+const sheet = document.getElementById("detailSheet");
+
+function openDetail(ev) {
+  const iconEl = document.getElementById("detailIcon");
+  if (ev.logoUrl) {
+    iconEl.src = ev.logoUrl;
+    iconEl.style.display = "block";
+    iconEl.onerror = () => { iconEl.style.display = "none"; };
+  } else {
+    iconEl.removeAttribute("src");
+    iconEl.style.display = "none";
+  }
+  document.getElementById("detailTitle").textContent = ev.title;
+  document.getElementById("detailTime").textContent = ev.time_label;
+  const locParts = [];
+  if (ev.host) locParts.push("Host: " + ev.host);
+  if (ev.location) locParts.push(ev.location);
+  const locEl = document.getElementById("detailLoc");
+  locEl.textContent = locParts.join(" · ");
+  locEl.style.display = locParts.length ? "block" : "none";
+  document.getElementById("detailTags").innerHTML =
+    ev.tags.map(t => `<span class="detail-tag">${t}</span>`).join("");
+  const rsvp = document.getElementById("detailRsvp");
+  if (ev.rsvpUrl) { rsvp.style.display = "block"; rsvp.href = ev.rsvpUrl; }
+  else { rsvp.style.display = "none"; }
+  overlay.classList.add("is-open");
+  sheet.classList.add("is-open");
+}
+function closeDetail() {
+  overlay.classList.remove("is-open");
+  sheet.classList.remove("is-open");
+}
+overlay.addEventListener("click", closeDetail);
+document.getElementById("detailCloseBtn").addEventListener("click", closeDetail);
+
+// ---- Build gutter (hour labels) -------------------------------------
+const gutter = document.createElement("div");
+gutter.className = "gutter";
+const gutterHeader = document.createElement("div");
+gutterHeader.className = "gutter-header";
+gutter.appendChild(gutterHeader);
+if (DATA.hasAllDay) {
+  const gAllDay = document.createElement("div");
+  gAllDay.className = "gutter-allday";
+  gutter.appendChild(gAllDay);
+}
+const gutterBody = document.createElement("div");
+gutterBody.className = "gutter-body";
+gutterBody.style.height = bodyHeight + "px";
+for (let h = DATA.displayStartHour; h <= DATA.displayEndHour; h++) {
+  const lbl = document.createElement("div");
+  lbl.className = "hour-label";
+  lbl.style.top = ((h - DATA.displayStartHour) * DATA.hourPx) + "px";
+  lbl.textContent = hourLabel(h);
+  gutterBody.appendChild(lbl);
+}
+gutter.appendChild(gutterBody);
+flex.appendChild(gutter);
+
+// ---- Day columns + event blocks -------------------------------------
+const dayEventLists = []; // one array per day, each entry: {hstart,hend,tags,_el}
+const dayCols = []; // one DOM element per day, for single-day paging
+
+DATA.days.forEach((dateStr, idx) => {
+  const col = document.createElement("div");
+  col.className = "day-col";
+
+  const header = document.createElement("div");
+  header.className = "day-header";
+  header.innerHTML = `<span class="dow">${DATA.dayLabels[idx]}</span><span class="num">${DATA.dayNums[idx]}</span>`;
+  col.appendChild(header);
+
+  if (DATA.hasAllDay) {
+    const adRow = document.createElement("div");
+    adRow.className = "day-allday";
+    (DATA.allDayByDay[dateStr] || []).forEach(title => {
+      const pill = document.createElement("span");
+      pill.className = "allday-pill";
+      pill.textContent = title;
+      pill.title = title;
+      adRow.appendChild(pill);
+    });
+    col.appendChild(adRow);
+  }
+
+  const body = document.createElement("div");
+  body.className = "day-body";
+  body.style.height = bodyHeight + "px";
+  body.style.backgroundImage =
+    `repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent ${DATA.hourPx}px)`;
+
+  const dayList = [];
+  (DATA.byDay[dateStr] || []).forEach(ev => {
+    const block = document.createElement("div");
+    block.className = "event-block";
+    block.style.background = ev.color;
+    block.style.color = ev.textColor;
+    block.innerHTML = `<span class="et-title">${ev.title}</span><span class="et-time">${ev.time_label}</span>`;
+
+    block.addEventListener("click", () => openDetail(ev));
+
+    body.appendChild(block);
+    dayList.push({ hstart: ev.hstart, hend: ev.hend, tags: ev.tags, _el: block });
+  });
+
+  col.appendChild(body);
+  flex.appendChild(col);
+  dayEventLists.push(dayList);
+  dayCols.push(col);
+});
+
+// ---- Single-day paging ------------------------------------------------
+let dayOffset = DATA.defaultDayIndex;
+const prevDayBtn = document.getElementById("prevDayBtn");
+const nextDayBtn = document.getElementById("nextDayBtn");
+const dayNavLabel = document.getElementById("dayNavLabel");
+
+function updateDayWindow() {
+  dayCols.forEach((col, idx) => {
+    col.classList.toggle("is-active", idx === dayOffset);
+  });
+  prevDayBtn.disabled = dayOffset === 0;
+  nextDayBtn.disabled = dayOffset === dayCols.length - 1;
+  dayNavLabel.textContent = `${DATA.dayLabels[dayOffset]}, ${DATA.dayNums[dayOffset]}`;
+}
+prevDayBtn.addEventListener("click", () => {
+  if (dayOffset > 0) { dayOffset -= 1; updateDayWindow(); }
+});
+nextDayBtn.addEventListener("click", () => {
+  if (dayOffset < dayCols.length - 1) { dayOffset += 1; updateDayWindow(); }
+});
+updateDayWindow();
+
+// ---- Layout / filtering ------------------------------------------------
+function clusterAndPack(events) {
+  const sorted = [...events].sort((a, b) => a.hstart - b.hstart);
+  const clusters = [];
+  let cur = [], curMaxEnd = null;
+  for (const ev of sorted) {
+    if (cur.length && ev.hstart >= curMaxEnd) {
+      clusters.push(cur);
+      cur = [];
+      curMaxEnd = null;
+    }
+    cur.push(ev);
+    curMaxEnd = curMaxEnd === null ? ev.hend : Math.max(curMaxEnd, ev.hend);
+  }
+  if (cur.length) clusters.push(cur);
+
+  for (const cluster of clusters) {
+    const trackEnd = [];
+    for (const ev of cluster) {
+      let placed = false;
+      for (let i = 0; i < trackEnd.length; i++) {
+        if (trackEnd[i] <= ev.hstart + 1e-9) {
+          trackEnd[i] = ev.hend;
+          ev._track = i;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        trackEnd.push(ev.hend);
+        ev._track = trackEnd.length - 1;
+      }
+    }
+    for (const ev of cluster) ev._tracksInCluster = trackEnd.length;
+  }
+  return sorted;
+}
+
+function matchesActiveTags(ev) {
+  if (activeTags.size === 0) return true;
+  for (const t of activeTags) {
+    if (!ev.tags.includes(t)) return false;
+  }
+  return true;
+}
+
+function applyFilters() {
+  let visibleTotal = 0, hiddenTotal = 0;
+  dayEventLists.forEach(dayList => {
+    const visible = dayList.filter(matchesActiveTags);
+    const hidden = dayList.filter(ev => !matchesActiveTags(ev));
+    hidden.forEach(ev => { ev._el.style.display = "none"; });
+    hiddenTotal += hidden.length;
+
+    clusterAndPack(visible);
+    visible.forEach(ev => {
+      const top = (ev.hstart - DATA.displayStartHour) * DATA.hourPx;
+      const height = Math.max((ev.hend - ev.hstart) * DATA.hourPx - 2, 16);
+      const widthPct = 100 / ev._tracksInCluster;
+      ev._el.style.display = "block";
+      ev._el.style.top = top + "px";
+      ev._el.style.height = height + "px";
+      ev._el.style.left = `calc(${ev._track * widthPct}% + 2px)`;
+      ev._el.style.width = `calc(${widthPct}% - 4px)`;
+    });
+    visibleTotal += visible.length;
+  });
+
+  filterCount.textContent = activeTags.size === 0
+    ? `Showing all ${visibleTotal} events`
+    : `Showing ${visibleTotal} of ${visibleTotal + hiddenTotal} events`;
+}
+
+applyFilters();
+</script>
+</body>
+</html>
